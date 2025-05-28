@@ -38,7 +38,7 @@ class TestDeepCopyOnObjectWithAtomics {
         private short shortFi = 2;
         private int intFi = 3;
         private long longFi = 4L;
-        private float floatFi = 5.5f;
+        private float floatFi = 5.5F;
         private double doubleFi = 6.6;
         private char charFi = 'H';
 
@@ -47,7 +47,7 @@ class TestDeepCopyOnObjectWithAtomics {
         private Short shortWrapFi = 20;
         private Integer intWrapFi = 30;
         private Long longWrapFi = 40L;
-        private Float floatWrapFi = 50.5f;
+        private Float floatWrapFi = 50.5F;
         private Double doubleWrapFi = 60.6;
         private Character charWrapFi = 'P';
 
