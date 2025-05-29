@@ -5,30 +5,35 @@ import java.lang.reflect.Field;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
-public class DeepCopyMaker<T> {
+public class DeepCopyMaker {
 
-    private final T original;
     private final TypesExpert typesExpert;
+    private final InstanceCrafter instanceCrafter = new InstanceCrafter();
 
-    private DeepCopyMaker(T instance) {
-        this.original = instance;
+    private DeepCopyMaker() {
         this.typesExpert = new TypesExpert();
     }
 
     public static <T> T deepCopy(T original) {
         try {
-            return original == null ? null : new DeepCopyMaker<>(original).make();
+            return original == null ? null : new DeepCopyMaker().makeCopyRecursive(original);
         } catch (Exception e) {
             throw new RuntimeException("Unable to make deep copy of %s".formatted(original), e);
         }
     }
 
     @SuppressWarnings("unchecked")
-    private T make() throws Exception {
+    private <T> T makeCopyRecursive(T original) throws Exception {
+        if (original == null) {
+            return null;
+        }
+
         Class<?> clazz = original.getClass();
 
         Object result;
+
         if (typesExpert.isAtomic(clazz)) {
             result = original;
         } else if (clazz.isRecord()) {
@@ -37,23 +42,21 @@ public class DeepCopyMaker<T> {
             result = copyPlainObject(original, clazz);
         }
 
-
         return (T) result;
     }
 
-    private Object copyPlainObject(Object object, Class<?> clazz) throws Exception {
-        Object copy = createInstance(clazz);
+    private Object copyPlainObject(Object host, Class<?> clazz) throws Exception {
+        Object hostCopy = instanceCrafter.createInstanceOf(clazz);
+
         for (Field field : getAllFields(clazz)) {
             field.setAccessible(true);
-            Object value = field.get(object);
+            Object value = field.get(host);
+            Object valueCopy = makeCopyRecursive(value);
 
-            if (value == null || typesExpert.isAtomic(field.getType())) {
-                field.set(copy, value);
-            } else {
-                throw new UnsupportedOperationException("Nested objects not supported");
-            }
+            field.set(hostCopy, valueCopy);
         }
-        return (T) copy;
+
+        return hostCopy;
     }
 
     private Object copyRecord(Object record, Class<?> clazz) throws Exception {
@@ -63,25 +66,16 @@ public class DeepCopyMaker<T> {
         for (int i = 0; i < components.length; i++) {
             var comp = components[i];
             Object value = comp.getAccessor().invoke(record);
+            Object valueCopy = makeCopyRecursive(value);
 
-            if (value == null || typesExpert.isAtomic(comp.getType())) {
-                args[i] = value;
-            } else {
-                throw new UnsupportedOperationException("Nested objects not supported");
-            }
+            args[i] = valueCopy;
         }
 
         Constructor<?> canonicalCtor = clazz.getDeclaredConstructor(
-            List.of(components).stream().map(RecordComponent::getType).toArray(Class[]::new)
+            Stream.of(components).map(RecordComponent::getType).toArray(Class[]::new)
         );
         canonicalCtor.setAccessible(true);
         return canonicalCtor.newInstance(args);
-    }
-
-    private static Object createInstance(Class<?> clazz) throws Exception {
-        Constructor<?> constructor = clazz.getDeclaredConstructor();
-        constructor.setAccessible(true);
-        return constructor.newInstance();
     }
 
     private static List<Field> getAllFields(Class<?> clazz) {
