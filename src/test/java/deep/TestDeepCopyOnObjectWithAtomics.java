@@ -33,26 +33,26 @@ class TestDeepCopyOnObjectWithAtomics {
     }
 
     static class AtomicFieldsOnly {
-        private boolean booleanFi = true;
-        private byte byteFi = 1;
-        private short shortFi = 2;
-        private int intFi = 3;
-        private long longFi = 4L;
-        private float floatFi = 5.5F;
-        private double doubleFi = 6.6;
-        private char charFi = 'H';
+        private final boolean booleanFi = true;
+        private final byte byteFi = 1;
+        private final short shortFi = 2;
+        private final int intFi = 3;
+        private final long longFi = 4L;
+        private final float floatFi = 5.5F;
+        private final double doubleFi = 6.6;
+        private final char charFi = 'H';
 
-        private Boolean booleanWrapFi = false;
-        private Byte byteWrapFi = 10;
-        private Short shortWrapFi = 20;
-        private Integer intWrapFi = 30;
-        private Long longWrapFi = 40L;
-        private Float floatWrapFi = 50.5F;
-        private Double doubleWrapFi = 60.6;
-        private Character charWrapFi = 'P';
+        private final Boolean booleanWrapFi = false;
+        private final Byte byteWrapFi = 10;
+        private final Short shortWrapFi = 20;
+        private final Integer intWrapFi = 30;
+        private final Long longWrapFi = 40L;
+        private final Float floatWrapFi = 50.5F;
+        private final Double doubleWrapFi = 60.6;
+        private final Character charWrapFi = 'P';
 
-        private String stringFi = "immutable";
-        private SampleEnum enumFi = SampleEnum.A;
+        private final String stringFi = "immutable";
+        private final SampleEnum enumFi = SampleEnum.A;
     }
 
     enum SampleEnum {

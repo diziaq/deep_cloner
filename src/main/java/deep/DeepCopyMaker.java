@@ -1,16 +1,26 @@
 package deep;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 public class DeepCopyMaker {
 
+    // guard against excessive recursion
+    private static final int MAX_OBJECT_GRAPH_SIZE = 3000;
+
     private final TypesExpert typesExpert;
     private final InstanceCrafter instanceCrafter = new InstanceCrafter();
+    private final Map<Object, Object> visited = new IdentityHashMap<>();
+
+    private int currentItemsCount = 0;
 
     private DeepCopyMaker() {
         this.typesExpert = new TypesExpert();
@@ -24,8 +34,11 @@ public class DeepCopyMaker {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private <T> T makeCopyRecursive(T original) throws Exception {
+        if (currentItemsCount++ > MAX_OBJECT_GRAPH_SIZE) {
+            throw new IllegalStateException("Maximum copy size (%s) exceeded. Context: %s.".formatted(MAX_OBJECT_GRAPH_SIZE, original));
+        }
+
         if (original == null) {
             return null;
         }
@@ -36,23 +49,48 @@ public class DeepCopyMaker {
 
         if (typesExpert.isAtomic(clazz)) {
             result = original;
+        } else if (visited.containsKey(original)) {
+            result = visited.get(original);
+        } else if (clazz.isArray()) {
+            result = copyArray(original, clazz.getComponentType());
         } else if (clazz.isRecord()) {
             result = copyRecord(original, clazz);
         } else {
             result = copyPlainObject(original, clazz);
         }
 
-        return (T) result;
+        @SuppressWarnings("unchecked")
+        T typedResult = (T) result;
+
+        return typedResult;
+    }
+
+    private Object copyArray(Object host, Class<?> componentClazz) throws Exception {
+        int length = Array.getLength(host);
+        Object hostCopy = Array.newInstance(componentClazz, length);
+        visited.put(host, hostCopy);
+
+        for (int i = 0; i < length; i++) {
+            Object element = Array.get(host, i);
+            Object elementCopy = makeCopyRecursive(element);
+            Array.set(hostCopy, i, elementCopy);
+        }
+
+        return hostCopy;
     }
 
     private Object copyPlainObject(Object host, Class<?> clazz) throws Exception {
         Object hostCopy = instanceCrafter.createInstanceOf(clazz);
+        visited.put(host, hostCopy);
 
         for (Field field : getAllFields(clazz)) {
+            if (Modifier.isStatic(field.getModifiers())) {
+                continue;
+            }
+
             field.setAccessible(true);
             Object value = field.get(host);
             Object valueCopy = makeCopyRecursive(value);
-
             field.set(hostCopy, valueCopy);
         }
 
@@ -64,8 +102,7 @@ public class DeepCopyMaker {
         Object[] args = new Object[components.length];
 
         for (int i = 0; i < components.length; i++) {
-            var comp = components[i];
-            Object value = comp.getAccessor().invoke(record);
+            Object value = components[i].getAccessor().invoke(record);
             Object valueCopy = makeCopyRecursive(value);
 
             args[i] = valueCopy;
@@ -75,7 +112,10 @@ public class DeepCopyMaker {
             Stream.of(components).map(RecordComponent::getType).toArray(Class[]::new)
         );
         canonicalCtor.setAccessible(true);
-        return canonicalCtor.newInstance(args);
+        Object result = canonicalCtor.newInstance(args);
+        visited.put(record, result);
+
+        return result;
     }
 
     private static List<Field> getAllFields(Class<?> clazz) {
