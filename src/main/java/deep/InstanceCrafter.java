@@ -45,6 +45,17 @@ final class InstanceCrafter {
         return args;
     }
 
+    /**
+     * Returns a default value suitable for the given class.
+     * <ul>
+     *   <li>For primitive types, returns the platform-generated zero-equivalent default (via single-element array creation).</li>
+     *   <li>For {@code Object[]} types, returns an empty object array — used as a local workaround for constructors with vararg parameters.</li>
+     *   <li>For all other types, returns {@code null}.</li>
+     * </ul>
+     *
+     * @param clazz the class for which the default value should be returned
+     * @return the default value appropriate for the given class
+     */
     private Object getDefaultValueFor(Class<?> clazz) {
         Object value = null;
 
@@ -55,6 +66,8 @@ final class InstanceCrafter {
                 value = Array.get(array, 0);
                 primitiveDefaults.put(clazz, value);
             }
+        } else if (clazz.equals(Object[].class)) {
+            value = new Object[0];
         }
 
         return value;
