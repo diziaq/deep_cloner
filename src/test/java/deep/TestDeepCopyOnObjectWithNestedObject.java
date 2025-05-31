@@ -2,6 +2,8 @@ package deep;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static deep.Util.assertDistinctInstancesMatch;
 
 class TestDeepCopyOnObjectWithNestedObject {
@@ -18,6 +20,15 @@ class TestDeepCopyOnObjectWithNestedObject {
                 new SampleObjectParamCtor(5434326, 12345L, "htrdseaw", SampleEnum.B),
                 null)
         );
+
+        var copy = DeepCopyMaker.deepCopy(original);
+
+        assertDistinctInstancesMatch(copy, original);
+    }
+
+    @Test
+    void should_copy_basic_object_with_nested_fields() {
+        var original = new Man("12", 34, List.of("1", "4"));
 
         var copy = DeepCopyMaker.deepCopy(original);
 
@@ -72,5 +83,41 @@ class TestDeepCopyOnObjectWithNestedObject {
 
     enum SampleEnum {
         A, C, B
+    }
+
+    static class Man {
+        private String name;
+        private int age;
+        private List<String> favoriteBooks;
+
+        public Man(String name, int age, List<String> favoriteBooks) {
+            this.name = name;
+            this.age = age;
+            this.favoriteBooks = favoriteBooks;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public int getAge() {
+            return age;
+        }
+
+        public void setAge(int age) {
+            this.age = age;
+        }
+
+        public List<String> getFavoriteBooks() {
+            return favoriteBooks;
+        }
+
+        public void setFavoriteBooks(List<String> favoriteBooks) {
+            this.favoriteBooks = favoriteBooks;
+        }
     }
 }
