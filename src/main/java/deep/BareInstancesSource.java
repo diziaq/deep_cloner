@@ -7,29 +7,38 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
-final class InstanceCrafter {
+final class BareInstancesSource {
+
+    private final static Comparator<Constructor<?>> BY_PARAMS_COUNT = Comparator.comparingInt(Constructor::getParameterCount);
+    private final static Object[] VARARG_DUMMY = new Object[0];
 
     private final Map<Class<?>, Object> primitiveDefaults = new HashMap<>();
-    private final Map<Class<?>, MakeBareInstance<?>> cache = new HashMap<>();
+    private final Map<Class<?>, Generator<?>> cache = new HashMap<>();
 
-    public Object createInstanceOf(Class<?> clazz) {
+    public InstantiationResult newInstanceOf(Class<?> clazz) {
         var maker = cache.get(clazz);
 
         if (maker == null) {
             var ctor =
                 Stream.of(clazz.getDeclaredConstructors())
-                      .min(Comparator.comparingInt(Constructor::getParameterCount))
+                      .min(BY_PARAMS_COUNT)
                       .orElseThrow(() -> new IllegalStateException("No constructors found for class: " + clazz.getName()));
 
             ctor.setAccessible(true);
-            maker = new MakeBareInstance<>(ctor, parametersCompatibleWith(ctor));
+            maker = new Generator<>(ctor, parametersCompatibleWith(ctor));
             cache.put(clazz, maker);
         }
 
         try {
-            return maker.get();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed instantiation for class: " + clazz.getName(), e);
+            return new InstantiationResult.Success(maker.get());
+        } catch (Exception exception) {
+            var unwrapped = unwrap(exception, NullPointerException.class);
+
+            if (unwrapped instanceof NullPointerException npe) {
+                return new InstantiationResult.NullPointer(npe);
+            } else {
+                return new InstantiationResult.GeneralFailure(exception);
+            }
         }
     }
 
@@ -67,13 +76,32 @@ final class InstanceCrafter {
                 primitiveDefaults.put(clazz, value);
             }
         } else if (clazz.equals(Object[].class)) {
-            value = new Object[0];
+            value = VARARG_DUMMY;
         }
 
         return value;
     }
 
-    private record MakeBareInstance<T>(
+    /**
+     * Traverses the exception cause chain and returns the first exception that matches
+     * any of the specified types. If no match is found, returns the original exception.
+     *
+     * @param exception  the exception to unwrap
+     * @param targetType exception class to match against the cause chain
+     * @return the first matching exception found in the cause chain, or the original exception if none match
+     */
+    private static Exception unwrap(Exception exception, Class<? extends Exception> targetType) {
+        Throwable current = exception;
+        while (current != null) {
+            if (targetType.isInstance(current)) {
+                return (Exception) current;
+            }
+            current = current.getCause();
+        }
+        return exception;
+    }
+
+    private record Generator<T>(
         Constructor<T> constructor,
         Object[] parameters
     ) {
